@@ -1,5 +1,3 @@
-library('RCurl')
-
 ## pulling data from Power to Choose
 getdata <- function()
   {
@@ -21,7 +19,7 @@ MonthlyUsage <- function(Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, 
 }
 
 ## Determines the cost by month based on usage at 500, 1000, and 2000 tiers  
-Cost <- function()
+Cost <- function(RawData, Usage)
 {
   CostData <- data.frame(RawData$idKey, RawData$kwh500, RawData$kwh1000, RawData$kwh2000)
   names(CostData) <- gsub("RawData\\.", "", names(CostData))
@@ -198,12 +196,18 @@ CostData$Annual <- CostData$Jan + CostData$Feb + CostData$Mar + CostData$Apr + C
 CostData
 }
 
-RawData <- getdata()
-Usage <- MonthlyUsage(600,688,715,819,766,1104,1350,1219,900,640,488,412)
-Price <- Cost()
-## Lowest Price Based on usage
-LowestPrice <- Price[Price$Annual == min(Price$Annual),]
+main <- function()
+{
+    library('RCurl')
 
-#this is the best plan based on your usage (ignores credits due to inability to easily derive from free form fields)
-CheapestPlan <- RawData[RawData$idKey == Price[which(Price$Annual == min(Price$Annual)),"idKey"],
-        c("TduCompanyName","RepCompany","Product","kwh500","kwh1000","kwh2000")]
+    RawData <- getdata()
+    Usage <- MonthlyUsage(600,688,715,819,766,1104,1350,1219,900,640,488,412)
+    Price <- Cost(RawData, Usage)
+    ## Lowest Price Based on usage
+    LowestPrice <- Price[Price$Annual == min(Price$Annual),]
+    
+    #this is the best plan based on your usage (ignores credits due to inability to easily derive from free form fields)
+    CheapestPlan <- RawData[RawData$idKey == Price[which(Price$Annual == min(Price$Annual)),"idKey"],
+            c("TduCompanyName","RepCompany","Product","kwh500","kwh1000","kwh2000")]
+    CheapestPlan
+}
