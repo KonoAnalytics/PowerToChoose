@@ -1,15 +1,70 @@
-## pulling data from Power to Choose
-getdata <- function()
-  {
-  PTCurl <- getURL('http://www.powertochoose.org/en-us/Plan/ExportToCsv')
-  PTCdata <- read.csv(textConnection(PTCurl), header=T)
-  names(PTCdata) <- gsub("\\.", "", names(PTCdata))
-  names(PTCdata) <- gsub("X", "", names(PTCdata))
-  PTCdata$TS <- Sys.time()
-  PTCdata <- PTCdata[-which(PTCdata$idKey == "END OF FILE"),]
-  PTCdata
+updateptc <- function(upload=FALSE)
+{
+    library("KonostdlibR")
+    loadpackage("RMySQL")
+    
+    user <- as.character(KonostdlibR::getcredentials("AWSMySQLSandbox")$userid)
+    password <- as.character(KonostdlibR::getcredentials("AWSMySQLSandbox")$password)
+    host <- as.character(KonostdlibR::getcredentials("AWSMySQLSandbox")$host)
+    dbname <- as.character(KonostdlibR::getcredentials("AWSMySQLSandbox")$dbname)
+    con <- RMySQL::dbConnect(MySQL(),user=user, password=password, host=host, dbname=dbname)
+    
+    dfptc <- getPTC()
+    rightnow <- Sys.time()
+    dfcurrent <- runmysql("select idKey from KonoDev.tbl_txptc where endTS is NULL", con=con)
+    dftdu <- runmysql("select tdulong, id from KonoDev.tbl_tdu", con=con)
+    dfnew <- dfptc[-which(dfptc$idKey %in% dfcurrent$idKey),]
+    if(nrow(dfnew)>0)
+    {
+        dfnew <- merge(dfnew,dftdu,by.x="TduCompanyName",by.y="tdulong")
+        dfnew$TduCompanyName <- NULL
+        names(dfnew)[names(dfnew) == "id"] <- "id_tdu"
+        dfnew$startTS <- rightnow
+        dfnew$endTS <- NA
+        if(upload)
+        {
+            dbWriteTable(conn=con, name="tbl_txptc", value=dfnew, append=TRUE, overwrite=FALSE, row.names = FALSE)
+        }
+    }else
+    {
+        #build empty data frame so it's returned in expected format, even though it won't be uploaded
+        dfnew$TDUCompanyName <- NULL
+        dfnew$startTS <- as.character()
+        dfnew$endTS <- as.character()
+        dfnew$id_tdu <- as.integer()
+    }
+    terminate <- dfcurrent[-which(dfcurrent$idKey %in% dfptc$idKey),]
+
+    if(length(terminate) > 0)
+    {
+        terminateestatement <- paste0("update KonoDev.tbl_txptc set endTS = '",rightnow,"' where idKey in (")
+        for (i in 1:length(terminate))
+        {
+            if(i != 1)
+            {
+                terminateestatement <- paste0(terminateestatement, ", ")
+            }
+            terminateestatement <- paste0(terminateestatement, "'",terminate[i],"'")
+        }
+        terminateestatement <- paste0(terminateestatement, ")")
+        if(upload)
+        {
+            markterminated <- runmysql(terminateestatement, con=con)
+        }
+    }
+    list(terminated=terminate, update=dfnew)
 }
 
+
+## pulling data from Power to Choose
+getPTC <- function()
+{
+    PTCdata <- read.csv('http://www.powertochoose.org/en-us/Plan/ExportToCsv/power-to-choose-offers.csv')
+    names(PTCdata) <- gsub("\\.", "", names(PTCdata))
+    names(PTCdata) <- gsub("X", "", names(PTCdata))
+    PTCdata <- PTCdata[-which(PTCdata$idKey == "END OF FILE"),]
+    PTCdata
+}
 
 ## Input df for monthly usages
 MonthlyUsage <- function(Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec)
