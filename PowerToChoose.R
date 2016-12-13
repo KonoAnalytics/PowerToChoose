@@ -55,6 +55,30 @@ updateptc <- function(upload=FALSE)
     list(terminated=terminate, update=dfnew)
 }
 
+txptctodomo <- function(upload=TRUE)
+{
+    library("KonostdlibR")
+    loadpackage("RMySQL")
+    
+    user <- as.character(KonostdlibR::getcredentials("AWSMySQLSandbox")$userid)
+    password <- as.character(KonostdlibR::getcredentials("AWSMySQLSandbox")$password)
+    host <- as.character(KonostdlibR::getcredentials("AWSMySQLSandbox")$host)
+    dbname <- as.character(KonostdlibR::getcredentials("AWSMySQLSandbox")$dbname)
+    con <- RMySQL::dbConnect(MySQL(),user=user, password=password, host=host, dbname=dbname)
+    
+    df <- KonostdlibR::runmysql("select p.*, t.*
+                                    from KonoDev.tbl_txptc p
+                                    left join KonoDev.tbl_tdu t
+                                    on p.id_tdu = t.id")
+    df$active <- FALSE
+    df$active[is.na(df$endTS)] <- TRUE
+    if(upload)
+    {
+        KonostdlibR::pushtodomo(df, "TX PTC")
+    }
+    df
+}
+
 
 ## pulling data from Power to Choose
 getPTC <- function()
