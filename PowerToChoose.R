@@ -13,7 +13,7 @@ updateptc <- function(upload=FALSE)
     rightnow <- Sys.time()
     dfcurrent <- runmysql("select idKey from KonoDev.tbl_txptc where endTS is NULL", con=con)
     dftdu <- runmysql("select tdulong, id from KonoDev.tbl_tdu", con=con)
-    dfnew <- dfptc[-which(dfptc$idKey %in% dfcurrent$idKey),]
+    dfnew <- dfptc[!(dfptc$idKey %in% dfcurrent$idKey),]
     if(nrow(dfnew)>0)
     {
         dfnew <- merge(dfnew,dftdu,by.x="TduCompanyName",by.y="tdulong")
